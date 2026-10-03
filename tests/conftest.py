@@ -182,3 +182,21 @@ def make_server(router: Router, tmp_path: Path) -> Callable[..., MCPServer]:
         )
 
     return factory
+
+
+@pytest.fixture
+async def mpc_corpus(router: Router, tmp_path: Path) -> Path:
+    """The 2026 MPC decisions (TR + EN, real recorded PDFs) ingested into tmp_path."""
+    from tr_macro_mcp.server import ingest
+
+    report = await ingest(
+        make_settings(tmp_path),
+        types=["mpc"],
+        languages=["tr", "en"],
+        mpc_since=2026,
+        reports_since=2026,
+        transport=httpx.MockTransport(router),
+        today=TODAY,
+    )
+    assert not report.failed, report.failed
+    return tmp_path

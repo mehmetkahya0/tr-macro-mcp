@@ -25,7 +25,17 @@ from tr_macro_mcp.docs.registry import DocumentRegistry
 from tr_macro_mcp.httpclient import PoliteClient
 from tr_macro_mcp.models import DocType, Language
 from tr_macro_mcp.store.timeseries import Store
-from tr_macro_mcp.tools import Services, documents, fx, series, sources
+from tr_macro_mcp.tools import (
+    Services,
+    compare,
+    documents,
+    explain,
+    fx,
+    prompts,
+    resources,
+    series,
+    sources,
+)
 
 INSTRUCTIONS = f"""\
 Turkish macroeconomic data and documents from the Central Bank of the Republic of Türkiye (TCMB),
@@ -33,7 +43,8 @@ with citations.
 
 - Keyless: official TCMB exchange rates (get_fx_rate; series codes 'FX:<CUR>') and TCMB documents
   (MPC decisions, Inflation Reports, Financial Stability Reports, Survey of Market Participants):
-  list_documents -> get_document_outline -> read_document / grep_documents.
+  list_documents -> get_document_outline -> read_document / grep_documents;
+  compare_ppk_statements (MPC wording changes); explain_move (a move plus cited context).
 - With EVDS_API_KEY: the EVDS catalogue (search_series, get_series, compare_periods).
 - Call list_data_sources to see what is available in this session.
 - Every result has a 'citations' list: cite it in answers. If a tool reports 'not_published' or
@@ -66,11 +77,13 @@ def create_server(
     store = Store(settings.cache_dir / "cache.duckdb")
     fx_source = TcmbXmlFxSource(http, store, today)
     evds_source = EvdsSource(http, store, settings.evds_api_key)
+    doc_registry = document_registry(settings)
     services = Services(
         registry=SourceRegistry([fx_source, evds_source]),
         fx=fx_source,
         evds=evds_source,
-        documents=DocumentNavigator(document_registry(settings)),
+        documents=DocumentNavigator(doc_registry),
+        doc_registry=doc_registry,
     )
 
     @asynccontextmanager
@@ -83,7 +96,7 @@ def create_server(
     mcp = MCPServer(
         "tr-macro-mcp", version=__version__, instructions=INSTRUCTIONS, lifespan=lifespan
     )
-    for module in (sources, fx, series, documents):
+    for module in (sources, fx, series, documents, compare, explain, resources, prompts):
         module.register(mcp, services)
     return mcp
 

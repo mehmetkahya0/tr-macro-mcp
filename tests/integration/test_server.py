@@ -22,6 +22,8 @@ EXPECTED_TOOLS = {
     "get_document_outline",
     "read_document",
     "grep_documents",
+    "compare_ppk_statements",
+    "explain_move",
 }
 
 

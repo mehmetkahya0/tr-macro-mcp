@@ -28,6 +28,8 @@ DATES = [
     dt.date(2025, 2, 28),
     dt.date(2025, 3, 28),
     dt.date(2025, 3, 31),  # Ramazan Bayramı: no bulletin
+    # Week of the 23 July 2026 MPC meeting (explain_move tests)
+    *(dt.date(2026, 7, d) for d in range(20, 25)),
 ]
 
 
