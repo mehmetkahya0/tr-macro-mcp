@@ -39,9 +39,11 @@ INSTRUCTION_RULES: dict[str, re.Pattern[str]] = {
         r"|below|here)"
     ),
     "role_prefix": re.compile(r"^\s*(system|assistant|user|developer)\s*:"),
+    # The tool must be the direct object ("call the get_fx_rate tool"). Real report prose that
+    # must not match: "use all the tools at its disposal", "call for ... policy tools".
     "tool_invocation": re.compile(
-        r"\b(call|invoke|run|use|execute)\b.{0,30}\b(tool|function)s?\b.{0,40}\b(with|now|"
-        r"immediately|argument|parameter)|\btool_call\b|\bfunction_call\b"
+        r"\b(call|invoke|trigger)\s+(the\s+|this\s+|a\s+|an\s+)?[\w-]*\s*(tool|function)s?\b"
+        r"|\btool_call\b|\bfunction_call\b"
     ),
     "exfiltration": re.compile(
         r"\b(reveal|print|output|send|leak|exfiltrate)\b.{0,40}\b(api[ _-]?key|secret|"

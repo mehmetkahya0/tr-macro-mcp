@@ -4,6 +4,7 @@ Re-running only re-reads index pages. MPC/IR/FSR documents are skipped by detail
 the survey (SMP) PDF URL never changes, so it is downloaded and compared by SHA-256.
 """
 
+import datetime as dt
 import hashlib
 import logging
 from pathlib import Path
@@ -29,6 +30,14 @@ class IngestReport(BaseModel):
     added: list[str] = Field(default_factory=list)
     skipped: int = 0
     failed: list[str] = Field(default_factory=list)
+
+
+def _date_matches_issue(candidate: Candidate, date: dt.date) -> bool:
+    """MPC issues are numbered per year ("2021-16"). A PDF date from another year is a typo in
+    the source (seen: ANO2021-16.pdf says "15 April 2020"), so it is not trusted."""
+    if candidate.doc_type != "mpc" or not candidate.issue:
+        return True
+    return candidate.issue[:4] == str(date.year)
 
 
 def make_doc_id(candidate: Candidate) -> str:
@@ -107,6 +116,14 @@ class Ingestor:
         parsed = parse_pdf(data)
         if candidate.doc_date is None and parsed.pages:
             found = parse_date(parsed.pages[0][:600])
+            if found and not _date_matches_issue(candidate, found[0]):
+                log.warning(
+                    "%s: PDF date %s contradicts issue %s; date left empty",
+                    candidate.page_url,
+                    found[0],
+                    candidate.issue,
+                )
+                found = None
             if found:
                 candidate = candidate.model_copy(
                     update={"doc_date": found[0], "date_precision": found[1]}
@@ -146,3 +163,49 @@ class Ingestor:
         )
         self._registry.upsert(info, local_path, parsed.outline_method, parsed.outline, pages)
         return doc_id
+
+    def reparse_all(self) -> IngestReport:
+        """Rebuild text, outlines and sanitisation from the stored PDFs (no network). Run after
+        changing parser or sanitiser rules."""
+        report = IngestReport()
+        for info in self._registry.list_documents():
+            stored = self._registry.get(info.doc_id)
+            if stored is None:
+                continue
+            try:
+                data = Path(stored.local_path).read_bytes()
+                doc_id = self.store(candidate_from_info(info), data, info.sha256)
+            except (OSError, TrMacroError) as exc:
+                report.failed.append(f"{info.doc_id}: {exc}")
+                continue
+            if doc_id != info.doc_id:
+                report.failed.append(f"{info.doc_id}: re-parsed as {doc_id}; re-run ingest")
+                continue
+            report.added.append(doc_id)
+        return report
+
+
+def candidate_from_info(info: DocumentInfo) -> Candidate:
+    """Rebuild the discovery-time candidate, so dates are derived exactly as at ingestion."""
+    if info.doc_type == "smp":
+        return Candidate(
+            doc_type="smp",
+            language=info.language,
+            title=info.title.split(" – ")[0],
+            issue=None,
+            doc_date=None,
+            date_precision="month",
+            page_url=info.page_url,
+            pdf_url=info.url,
+        )
+    parsed = parse_date(info.title)
+    return Candidate(
+        doc_type=info.doc_type,
+        language=info.language,
+        title=info.title,
+        issue=info.issue,
+        doc_date=parsed[0] if parsed else None,
+        date_precision=parsed[1] if parsed else "day",
+        page_url=info.page_url,
+        pdf_url=info.url,
+    )

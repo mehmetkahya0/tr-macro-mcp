@@ -1,6 +1,7 @@
 """Parsing and discovery against recorded real TCMB pages/PDFs (tests/fixtures/docs)."""
 
 import datetime as dt
+from pathlib import Path
 
 import httpx
 import pytest
@@ -45,6 +46,7 @@ def discoverer(docs: FakeTcmbDocs) -> Discoverer:
         ("Finansal İstikrar Raporu - Mayıs 2026, Sayı 42", (dt.date(2026, 5, 1), "month")),
         ("NİSAN 2026", (dt.date(2026, 4, 1), "month")),
         ("SEPTEMBER 2026", (dt.date(2026, 9, 1), "month")),
+        ("Para Politikası Kurulu Kararı 18Ocak2018, Sayı: 201", (dt.date(2018, 1, 18), "day")),
         ("no date here", None),
     ],
 )
@@ -119,3 +121,50 @@ class TestParsePdf:
         assert "Para Politikası Kurulu Kararı" in parsed.pages[0]
         assert "yüzde 38’den" in parsed.pages[0]
         assert parse_date(parsed.pages[0]) == (dt.date(2026, 1, 22), "day")
+
+
+def test_typo_in_mpc_title_is_still_discovered() -> None:
+    """TCMB titled 2014-52 and 2014-59 'Basın Duyusuru' (sic) in the PPK index."""
+    from tr_macro_mcp.docs.fetch import MPC_TITLE
+
+    assert MPC_TITLE["tr"].match("Faiz Oranlarına İlişkin Basın Duyusuru - 17/07/2014 (2014-52)")
+    assert MPC_TITLE["en"].match("Press Release on Interest Rates (2025-24)")
+    assert not MPC_TITLE["en"].match("Press Release on Interest Rate and Profit Rate Statistics")
+
+
+def test_pdf_date_contradicting_the_issue_year_is_not_trusted() -> None:
+    from tr_macro_mcp.docs.fetch import Candidate
+    from tr_macro_mcp.docs.ingest import _date_matches_issue
+
+    candidate = Candidate(
+        doc_type="mpc", language="en", title="t", issue="2021-16", doc_date=None, page_url="u"
+    )
+    assert _date_matches_issue(candidate, dt.date(2021, 4, 15))
+    assert not _date_matches_issue(candidate, dt.date(2020, 4, 15))  # typo in ANO2021-16.pdf
+
+
+def test_registry_skips_known_report_pages_but_not_the_shared_survey_page(tmp_path: Path) -> None:
+    from tr_macro_mcp.docs.registry import DocumentRegistry
+    from tr_macro_mcp.models import DocumentInfo
+    from tr_macro_mcp.store.timeseries import utcnow
+
+    registry = DocumentRegistry(tmp_path / "documents.duckdb")
+    for doc_type, page in (("ir", "https://x/ir-page"), ("smp", "https://x/smp-page")):
+        info = DocumentInfo(
+            doc_id=f"{doc_type}-1-en",
+            doc_type=doc_type,
+            language="en",
+            title="t",
+            issue="1",
+            doc_date=None,
+            date_precision="day",
+            page_count=0,
+            url=f"https://x/{doc_type}.pdf",
+            page_url=page,
+            sha256="0" * 64,
+            ingested_at=utcnow(),
+        )
+        registry.upsert(info, tmp_path / "f.pdf", "none", [], [])
+    known = registry.known_sources()
+    assert "https://x/ir-page" in known
+    assert "https://x/smp-page" not in known

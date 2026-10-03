@@ -22,9 +22,11 @@ WCM = f"{SITE}/wps/wcm/connect"
 MPC_TR_INDEX = f"{WCM}/TR/TCMB+TR/PPK/PPK+Toplanti+Kararlari"
 MPC_TR_PRESS = f"{WCM}/TR/TCMB+TR/Main+Menu/Duyurular/Basin/{{year}}"
 MPC_EN_PRESS = f"{WCM}/EN/TCMB+EN/Main+Menu/Announcements/Press+Releases/{{year}}"
+# TCMB titles contain typos ("Basın Duyusuru" for 2014-52 and 2014-59), and similar titles
+# exist for other releases ("Press Release on Interest Rate and Profit Rate Statistics").
 MPC_TITLE = {
-    "tr": "Faiz Oranlarına İlişkin Basın Duyurusu",
-    "en": "Press Release on Interest Rates",
+    "tr": re.compile(r"^Faiz Oranlarına İlişkin Basın Duy(urusu|usuru)\b"),
+    "en": re.compile(r"^Press Release on Interest Rates\b"),
 }
 REPORT_INDEX: dict[tuple[str, str], str] = {
     ("ir", "tr"): f"{WCM}/TR/TCMB+TR/Main+Menu/Yayinlar/Raporlar/Enflasyon+Raporu",
@@ -148,7 +150,7 @@ def parse_date(text: str) -> tuple[dt.date, DatePrecision] | None:
     """First date in text: '22 Ocak 2026', 'January 22, 2026', '21/01/2014', 'Mayıs 2026'."""
     lowered = fold(text)
     patterns: list[tuple[str, str]] = [
-        (rf"\b(\d{{1,2}})\s+({_MONTH})\s+(\d{{4}})\b", "dmy"),
+        (rf"\b(\d{{1,2}})\s*({_MONTH})\s*(\d{{4}})\b", "dmy"),  # also "18Ocak2018"
         (rf"\b({_MONTH})\s+(\d{{1,2}}),\s*(\d{{4}})\b", "mdy"),
         (r"\b(\d{2})/(\d{2})/(\d{4})\b", "numeric"),
         (rf"\b({_MONTH})\s+(\d{{4}})\b", "my"),
@@ -185,19 +187,19 @@ class Discoverer:
 
     async def mpc(self, language: Language, since_year: int) -> list[Candidate]:
         """MPC decisions. TR: the PPK index (lags) plus recent press-release lists;
-        EN: yearly press-release lists. Numbering matches across languages."""
-        if language == "tr":
-            pages = [MPC_TR_INDEX] + [
-                MPC_TR_PRESS.format(year=y) for y in (self._today.year - 1, self._today.year)
-            ]
+        EN: yearly press-release lists. Numbers differ across languages in some years;
+        pair TR/EN decisions by date."""
+        years = range(since_year, self._today.year + 1)
+        if language == "tr":  # the PPK index lags (e.g. Dec 2024 and Sept 2026 were missing)
+            pages = [MPC_TR_INDEX] + [MPC_TR_PRESS.format(year=y) for y in years]
         else:
-            pages = [MPC_EN_PRESS.format(year=y) for y in range(since_year, self._today.year + 1)]
+            pages = [MPC_EN_PRESS.format(year=y) for y in years]
         found: dict[str, Candidate] = {}
         code = "DUY" if language == "tr" else "ANO"
         for page in pages:
             for link in await self._links(page, required=page == MPC_TR_INDEX):
                 issue = re.search(r"\((\d{4}-\d{2})\)", link.text)
-                if not link.text.startswith(MPC_TITLE[language]) or not issue:
+                if not MPC_TITLE[language].match(link.text) or not issue:
                     continue
                 if f"/{code}{issue[1]}" not in link.href or int(issue[1][:4]) < since_year:
                     continue

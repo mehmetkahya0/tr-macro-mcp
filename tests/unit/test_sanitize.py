@@ -39,6 +39,9 @@ def test_instruction_like_lines_are_removed(line: str, rule: str) -> None:
         "Banks executed transactions using the instruments listed in Table 2.",
         "Para politikası araçları etkin bir şekilde kullanılmaya devam edilecektir.",
         "Previous projections assumed lower energy prices.",
+        # Real false positives found by the corpus audit (2023-24 MPC decisions, FSR 35):
+        "will continue to decisively use all the tools at its disposal in line with its main",
+        "Steps taken after exit from the pandemic call for multidimensional policy tools",
     ],
 )
 def test_ordinary_central_bank_prose_is_untouched(line: str) -> None:

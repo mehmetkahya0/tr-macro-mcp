@@ -136,9 +136,20 @@ def main(argv: Sequence[str] | None = None) -> None:
     ingest_cmd.add_argument("--languages", type=_csv(ALL_LANGUAGES), default=list(ALL_LANGUAGES))
     ingest_cmd.add_argument("--mpc-since", type=int, default=2014)
     ingest_cmd.add_argument("--reports-since", type=int, default=2022)
+    commands.add_parser("reparse", help="rebuild document text from stored PDFs (no network)")
     args = parser.parse_args(argv)
     settings = Settings()
     log = logging.getLogger("tr_macro_mcp")
+    if args.command == "reparse":
+        http = _http(settings, None)  # unused: reparse never touches the network
+        report = Ingestor(
+            http, document_registry(settings), settings.cache_dir / "documents"
+        ).reparse_all()
+        anyio.run(http.aclose)
+        log.info("Re-parsed %d documents, failed %d", len(report.added), len(report.failed))
+        for failure in report.failed:
+            log.warning("FAILED %s", failure)
+        sys.exit(1 if report.failed else 0)
     if args.command == "ingest":
         log.info(
             "Ingesting into %s (%ss between requests)",

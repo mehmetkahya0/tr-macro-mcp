@@ -45,20 +45,19 @@ def parse_pdf(data: bytes) -> ParsedPdf:
     try:
         pages = [_page_text(pdf, i) for i in range(len(pdf))]
         labels = page_labels(pages)
-        outline = _bookmarks(pdf, labels)
+        bookmarks = _bookmarks(pdf, labels)
     finally:
         pdf.close()
-    if outline:
+    contents = contents_outline(pages, labels)
+    if contents:  # the printed Contents page is the most faithful outline
         return ParsedPdf(
-            pages=pages, page_labels=labels, outline=outline, outline_method="bookmarks"
+            pages=pages, page_labels=labels, outline=contents, outline_method="contents_page"
         )
-    outline = contents_outline(pages, labels)
-    return ParsedPdf(
-        pages=pages,
-        page_labels=labels,
-        outline=outline,
-        outline_method="contents_page" if outline else "none",
-    )
+    if bookmarks:
+        return ParsedPdf(
+            pages=pages, page_labels=labels, outline=bookmarks, outline_method="bookmarks"
+        )
+    return ParsedPdf(pages=pages, page_labels=labels, outline=[], outline_method="none")
 
 
 def _page_text(pdf: pdfium.PdfDocument, index: int) -> str:
@@ -148,7 +147,8 @@ def _bookmarks(pdf: pdfium.PdfDocument, labels: list[str | None]) -> list[Outlin
                 page_label=labels[page - 1] if page and page <= len(labels) else None,
             )
         )
-    # Slide decks export one "Slide N" bookmark per page: no structural information.
-    if entries and all(re.fullmatch(r"Slide \d+", e.title) for e in entries):
+    # Bookmarks named after files ("1b25_ii", "Cilt1") or slides ("Slide 3") carry no
+    # structure; keep them only if every title looks like a heading.
+    if any(" " not in e.title or re.fullmatch(r"Slide \d+", e.title) for e in entries):
         return []
     return entries

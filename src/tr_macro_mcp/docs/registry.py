@@ -110,19 +110,18 @@ class DocumentRegistry:
                     json.dumps([e.model_dump() for e in outline], ensure_ascii=False),
                 ],
             )
-            conn.executemany(
-                "INSERT INTO pages VALUES (?, ?, ?, ?, ?)",
+            rows = [
                 [
-                    [
-                        info.doc_id,
-                        p.page,
-                        p.page_label,
-                        p.text,
-                        json.dumps([f.model_dump() for f in p.flags]),
-                    ]
-                    for p in pages
-                ],
-            )
+                    info.doc_id,
+                    p.page,
+                    p.page_label,
+                    p.text,
+                    json.dumps([f.model_dump() for f in p.flags]),
+                ]
+                for p in pages
+            ]
+            if rows:  # executemany rejects an empty list
+                conn.executemany("INSERT INTO pages VALUES (?, ?, ?, ?, ?)", rows)
             conn.execute("COMMIT")
 
     def get(self, doc_id: str) -> StoredDocument | None:
@@ -148,7 +147,7 @@ class DocumentRegistry:
         known: dict[str, str] = {}
         for doc_id, page_url, url, doc_type in rows:
             known[url] = doc_id
-            if doc_type == "mpc":  # one decision per page; reports may share index pages
+            if doc_type != "smp":  # one document per detail page; the survey page is shared
                 known[page_url] = doc_id
         return known
 
