@@ -56,7 +56,6 @@ def create_server(
             yield
         finally:
             await http.aclose()
-            store.close()
 
     mcp = MCPServer(
         "tr-macro-mcp", version=__version__, instructions=INSTRUCTIONS, lifespan=lifespan
