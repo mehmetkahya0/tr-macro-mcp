@@ -19,6 +19,7 @@ uv run python scripts/record_fx_fixtures.py     # re-record TCMB XML fixtures
 uv run python scripts/record_evds_fixtures.py   # record real EVDS fixtures (needs key)
 uv run python scripts/record_doc_fixtures.py    # re-record TCMB document fixtures
 uv run python scripts/make_poisoned_pdf.py      # regenerate prompt-injection test PDF
+uv run python scripts/demo.py > docs/demos.md   # scripted keyless demos (needs ingested corpus)
 make eval-quick                      # offline, keyless retrieval eval (Phase 4+)
 ```
 
@@ -32,6 +33,10 @@ make eval-quick                      # offline, keyless retrieval eval (Phase 4+
 - `docs/`: `fetch` (discover by following index links), `parse` (pypdfium2: pages, printed page
   labels, outline), `ingest` (idempotent), `registry` (`documents.duckdb`, sanitised page text),
   `navigate` (Mode A queries). PDFs are kept in `<cache>/documents/`.
+- `analysis/`: `compare` (MPC sentence diff + lexicon-v1 tone heuristic), `explain` (movement
+  summary + evidence by date window/keywords; never causal claims).
+- `tools/compare.py`, `tools/explain.py`, `tools/resources.py` (`tcmb://documents/...`),
+  `tools/prompts.py` (3 workflow prompts).
 - `security/sanitize.py`: applied at ingest; output is wrapped at read time. Changing the rules
   requires re-ingesting (delete `documents.duckdb`).
 - `tools/`: thin MCP tools; `tool_errors` turns `TrMacroError` into `ToolError`.
