@@ -18,6 +18,10 @@ EXPECTED_TOOLS = {
     "search_series",
     "get_series",
     "compare_periods",
+    "list_documents",
+    "get_document_outline",
+    "read_document",
+    "grep_documents",
 }
 
 

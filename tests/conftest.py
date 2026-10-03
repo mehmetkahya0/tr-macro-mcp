@@ -16,6 +16,7 @@ from tr_macro_mcp.server import create_server
 
 FIXTURES = Path(__file__).parent / "fixtures"
 FX_DIR = FIXTURES / "tcmb_fx"
+DOCS_DIR = FIXTURES / "docs"
 TODAY = dt.date(2026, 10, 3)  # the day fixtures were recorded (a Saturday)
 TEST_KEY = "test-key-not-real"
 
@@ -123,14 +124,37 @@ class FakeEvds:
         }
 
 
+class FakeTcmbDocs:
+    """Serves recorded TCMB HTML pages and PDFs by exact URL (tests/fixtures/docs)."""
+
+    def __init__(self) -> None:
+        self.requests: list[str] = []
+        self._manifest: dict[str, dict[str, str]] = json.loads(
+            (DOCS_DIR / "manifest.json").read_text(encoding="utf-8")
+        )
+
+    def file_for(self, url: str) -> Path:
+        return DOCS_DIR / self._manifest[url]["file"]
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        self.requests.append(url)
+        if url not in self._manifest:
+            raise UnexpectedRequestError(f"No document fixture recorded for {url}")
+        return httpx.Response(200, content=self.file_for(url).read_bytes())
+
+
 class Router:
     def __init__(self) -> None:
         self.tcmb = FakeTcmb()
+        self.docs = FakeTcmbDocs()
         self.evds = FakeEvds()
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         if request.url.host == "www.tcmb.gov.tr":
-            return self.tcmb(request)
+            if request.url.path.startswith("/kurlar/"):
+                return self.tcmb(request)
+            return self.docs(request)
         if request.url.host == "evds3.tcmb.gov.tr":
             return self.evds(request)
         raise UnexpectedRequestError(f"Unexpected host {request.url.host}")
@@ -141,15 +165,20 @@ def router() -> Router:
     return Router()
 
 
+def make_settings(cache_dir: Path, key: str | None = None) -> Settings:
+    return Settings(
+        _env_file=None,
+        evds_api_key=SecretStr(key) if key else None,
+        cache_dir=cache_dir,
+        min_request_interval=0,
+    )
+
+
 @pytest.fixture
 def make_server(router: Router, tmp_path: Path) -> Callable[..., MCPServer]:
     def factory(key: str | None = None) -> MCPServer:
-        settings = Settings(
-            _env_file=None,
-            evds_api_key=SecretStr(key) if key else None,
-            cache_dir=tmp_path,
-            min_request_interval=0,
+        return create_server(
+            make_settings(tmp_path, key), transport=httpx.MockTransport(router), today=lambda: TODAY
         )
-        return create_server(settings, transport=httpx.MockTransport(router), today=lambda: TODAY)
 
     return factory
