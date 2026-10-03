@@ -196,7 +196,7 @@ links from index pages, never constructed**.
   → Discover from **both** the PPK index and the yearly press-release lists
   (`…/Duyurular/Basin/{YYYY}`), filtered by title "Faiz Oranlarına İlişkin Basın Duyurusu".
 - EN: `…/EN/TCMB+EN/Main+Menu/Announcements/Press+Releases/{YYYY}/ANO{YYYY}-{NN}`, title
-  "Press Release on Interest Rates (YYYY-NN)". **Numbering matches TR** (`DUY2026-23` ↔ `ANO2026-23`).
+  "Press Release on Interest Rates (YYYY-NN)". ~~Numbering matches TR~~ **Correction (Phase 2 audit):** numbers match in 2026 (`DUY2026-23` ↔ `ANO2026-23`) but **not in general** (2014-2017: TR `DUY2014-07` = EN `ANO2014-06`, both 28 Jan 2014; also `DUY2024-70`/`ANO2024-69`, `DUY2025-63`/`ANO2025-61`). Pair TR/EN decisions by **meeting date**, never by number.
 - Each decision is an HTML page **plus a PDF** (`DUY2026-01.pdf`, `ANO2026-01.pdf`). The PDF is
   clean, about 1–2 pages, and begins: "Para Politikası Kurulu Kararı / 22 Ocak 2026 / Sayı: 2026-01 /
   Toplantıya Katılan Kurul Üyeleri …". → **Use the PDF as the canonical text** (real page numbers).
@@ -227,7 +227,37 @@ links from index pages, never constructed**.
   → We can only snapshot it from now on. Historical survey values are numeric series in EVDS
   (key required).
 
-### 3.5 Other discovery aids
+### 3.5 Verified during Phase 2 (2026-10-03)
+- **MPC, EN yearly lists** exist back to at least 2014
+  (`…/Press+Releases/2014`). Older link texts include the date ("Press Release on Interest Rates –
+  24/12/2014, (2014-77)"); recent ones do not ("… (2026-38)"). The date is then read from the
+  PDF ("22 Ocak 2026 / Sayı: 2026-01", "January 22, 2026 No: 2026-01").
+- MPC decision pages from 2014 also link a PDF (`DUY2014-01.pdf`).
+- **Report index link texts carry the date**: "Enflasyon Raporu 2026 - III (13 Ağustos 2026)",
+  "Inflation Report 2026 - III (August 13, 2026)", "Finansal İstikrar Raporu - Mayıs 2026, Sayı 42"
+  (FSR: month precision only). Index pages list each report twice (image link + text link).
+- **The full-text PDF on a report page** is the link labelled "Click For Full Text" (EN) /
+  "Tam Metin İçin Tıklayınız" (TR); the other PDFs are chapters. File names vary
+  (`Inflation+Report2026iii.pdf`, `enf26_iii_tam.pdf`, `Tam+Metin.pdf`, `1.Tam+Metin.pdf`).
+- Constructed detail URLs 404 (`…/Inflation+Report+2022-I`, `…/2022/Volume+35`). Only
+  link-following works.
+- **SMP**: TR page links `PKA_Rapor.pdf`, EN page `SMP_Report.pdf`; the survey month is only on
+  the PDF cover ("SEPTEMBER 2026"), so snapshots get their id from the PDF.
+- Text extraction: pypdfium2 (ADR 0002). pdfium emits U+FFFE for line-break hyphens.
+- **Source errors found by auditing the full corpus** (330 documents, 4,195 pages):
+  - TR titles with a typo: "Faiz Oranlarına İlişkin Basın **Duyusuru**" (2014-52, 2014-59).
+  - A similar but different EN release, "Press Release on Interest Rate and Profit Rate
+    Statistics (2025-26)", must not be taken for an MPC decision (match "Interest Rate**s**").
+  - The TR PPK index lacks some decisions (2024-70, 2026-38); they are in the yearly press lists.
+  - 2018 TR PDFs print dates without spaces ("18Ocak2018").
+  - `ANO2021-16.pdf` says "15 April **2020**" for decision 2021-16 (TR: 15 Nisan 2021). PDF dates
+    whose year contradicts the issue number are discarded (that document stays undated).
+  - Five TR Inflation Report PDFs have bookmarks named after files ("1b25_ii", "Cilt1"); the
+    printed Contents page is used instead.
+- Corpus after the audit: MPC 136 TR + 136 EN (2014-01 to 2026-09; dates pair one-to-one), IR 19+19,
+  FSR 9+9 (2022 on), SMP 1+1; about 190 MB; full ingest ~13 min, incremental ~40 s (35 requests).
+
+### 3.6 Other discovery aids
 - Publications RSS: `https://tcmb.gov.tr/wps/wcm/connect/EN/TCMB+EN/Bottom+Menu/Other/RSS/Publications`
   (lists recent PDFs). This is a polite way to detect new releases.
 

@@ -4,13 +4,15 @@ An [MCP](https://modelcontextprotocol.io) server that gives LLM clients (Claude 
 Code, Cursor, ...) structured, **cited** access to Turkish macroeconomic data from the Central
 Bank of the Republic of Türkiye (TCMB).
 
-- **Works without any API key**: official TCMB exchange rates for any business day since 1996.
+- **Works without any API key**: official TCMB exchange rates for any business day since 1996,
+  and TCMB documents (MPC rate decisions, Inflation Reports, Financial Stability Reports, Survey
+  of Market Participants) in Turkish and English, with page-level citations.
 - **Optional free EVDS key** unlocks the EVDS catalogue (policy rates, inflation, reserves, ...).
 - **Every result carries citations** (source, URL, date, bulletin number, retrieval time). Missing
   data is reported as missing, never guessed or silently replaced by another date.
 
-> Status: Phase 1 of 6 (numeric data). TCMB documents (MPC decisions, Inflation Report, ...),
-> cross-source tools and the evaluation harness follow. See [PLAN.md](PLAN.md).
+> Status: Phase 2 of 6 (numeric data + documents). Cross-source tools, the evaluation harness
+> and RAG mode follow. See [PLAN.md](PLAN.md).
 
 > **Disclaimer.** Data and cited summaries only; **not investment advice**. Data © TCMB, used
 > with attribution under [TCMB's terms](https://tcmb.gov.tr/wps/wcm/connect/TR/TCMB+TR/Bottom+Menu/Diger/Kullanim+Sartlari);
@@ -25,8 +27,16 @@ Requirements: [uv](https://docs.astral.sh/uv/) (it installs a suitable Python fo
 git clone <this repo> tr-macro-mcp
 cd tr-macro-mcp
 uv sync
+uv run tr-macro-mcp ingest # one-off: download and index TCMB documents (~10-15 min, ~150 MB)
 uv run tr-macro-mcp        # starts the stdio server (Ctrl+C to stop); clients normally launch it
 ```
+
+`ingest` is polite (1 request/s, descriptive User-Agent) and idempotent: re-run it any time to
+pick up new publications; it only re-reads index pages and downloads what is new. Narrow it with
+`--types mpc,ir,fsr,smp`, `--languages tr,en`, `--mpc-since 2014`, `--reports-since 2022`.
+The server never downloads documents during a conversation; it reads the local corpus.
+After upgrading tr-macro-mcp, `uv run tr-macro-mcp reparse` rebuilds the text index from the
+already downloaded PDFs (no network).
 
 ### Connect Claude Code
 
@@ -80,6 +90,14 @@ Without a key, EVDS tools return `EVDS_API_KEY not set; see README` instead of f
 | `search_series(query)` | EVDS | Find EVDS series codes by Turkish/English keywords |
 | `get_series(series_code, start, end, frequency?, aggregation?, source?)` | EVDS, or no for `FX:<CUR>` | Observations + metadata + citations |
 | `compare_periods(series_code, period A, period B)` | as above | Descriptive change statistics between two periods |
+| `list_documents(doc_type?, language?, date_from?, date_to?, query?)` | no | Local TCMB documents, newest first |
+| `get_document_outline(doc_id)` | no | Sections with PDF page and printed page number |
+| `read_document(doc_id, page_start, page_end?)` | no | Page text (max 10 pages / 40k chars per call) with page citations |
+| `grep_documents(pattern, regex?, filters...)` | no | Page-level matches across documents, newest first |
+
+Document text is always returned between `BEGIN/END UNTRUSTED DOCUMENT TEXT` markers. Lines that
+read like instructions to an AI (prompt injection) are removed and reported in
+`security_notices`.
 
 Keyless FX series codes: `FX:USD`, `FX:EUR:forex_selling`, ... (`rate_type` is one of
 `forex_buying` (default), `forex_selling`, `banknote_buying`, `banknote_selling`). Keyless
@@ -101,6 +119,8 @@ uv run pytest -m live            # live smoke test against TCMB (network)
 uv run ruff check . && uv run ruff format --check . && uv run mypy
 uv run python scripts/record_fx_fixtures.py      # re-record TCMB XML fixtures
 uv run python scripts/record_evds_fixtures.py    # record real EVDS fixtures (needs key)
+uv run python scripts/record_doc_fixtures.py     # re-record TCMB document fixtures
+uv run python scripts/make_poisoned_pdf.py       # regenerate the prompt-injection test PDF
 ```
 
 Verified facts about the data sources (URLs, formats, limits, terms) are in
@@ -113,6 +133,11 @@ Verified facts about the data sources (URLs, formats, limits, terms) are in
 - Bulletins before 2005 are in old lira (TRL); values are converted at 1 TRY = 1,000,000 TRL and
   flagged.
 - EVDS has no unit field; units are usually stated in the series name.
+- Documents: text only. Charts and most "tables" in the reports are graphics, so their numbers
+  are not reliably extractable. Outlines come from each report's Contents page (TCMB PDFs have
+  no bookmarks); MPC decisions are 1-2 pages and have no outline.
+- TCMB publishes only the latest Survey of Market Participants report; the corpus keeps a
+  snapshot each time `ingest` runs in a new month. History is in EVDS (key).
 - The EVDS observation parser was written against TCMB's documentation and its reference
   client, and is not yet validated against recorded live responses (pending a key; see
   `scripts/record_evds_fixtures.py`).
