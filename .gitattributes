@@ -1,0 +1,2 @@
+# Recorded fixtures are compared byte-for-byte; never convert line endings.
+tests/fixtures/** -text

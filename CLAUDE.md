@@ -6,15 +6,28 @@ Market Participants). The eval harness is a first-class deliverable. See `PLAN.m
 status, and `docs/data-sources.md` for **verified** API facts. Read both before changing data access.
 
 ## Commands
-Commands become available in Phase 1. Until then the repo contains docs only.
+On this Windows machine uv is at `%APPDATA%\Python\Python312\Scripts\uv.exe` (not on PATH).
 ```
-uv sync --all-extras                 # setup
-uv run tr-macro-mcp                  # run stdio server
-uv run pytest                        # tests (offline, fixtures only)
+uv sync --extra dev                  # setup
+uv run tr-macro-mcp                  # run stdio server (logs to stderr; stdout is the protocol)
+uv run pytest                        # tests (offline, fixtures only; `live` excluded)
+uv run pytest -m live                # live stdio smoke test against TCMB
 uv run ruff check . && uv run ruff format --check .
-uv run mypy src
+uv run mypy                          # strict, src/ only
+uv run python scripts/record_fx_fixtures.py     # re-record TCMB XML fixtures
+uv run python scripts/record_evds_fixtures.py   # record real EVDS fixtures (needs key)
 make eval-quick                      # offline, keyless retrieval eval (Phase 4+)
 ```
+
+## Layout
+- `server.py`: `create_server(settings, transport=, today=)` factory (tests inject an
+  `httpx.MockTransport` and a fixed date) + `main()`.
+- `datasources/`: `base.DataSource` protocol, `tcmb_fx_xml`, `evds`, `registry` (routes codes:
+  `FX:*` → XML, everything else → EVDS).
+- `store/timeseries.py`: DuckDB `fx_bulletins` (past dates permanent) + `response_cache` (TTL).
+- `tools/`: thin MCP tools; `tool_errors` turns `TrMacroError` into `ToolError`.
+- `tests/conftest.py`: `FakeTcmb` (recorded XML; unknown URLs fail the test) and `FakeEvds`
+  (SYNTHETIC payloads with fake codes like `TP.TEST.RATE`, until real fixtures are recorded).
 
 ## Non-negotiables
 - **Never fabricate** numbers, quotes or page refs. A miss returns an explicit "not found" result.
