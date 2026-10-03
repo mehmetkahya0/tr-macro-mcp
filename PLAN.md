@@ -1,7 +1,9 @@
 # tr-macro-mcp — Plan
 
-Status: Phase 0 approved and merged (2026-10-03). **Phase 1 implemented on `phase-1`,
-awaiting review.** Open item: EVDS parser validation against recorded live responses (needs a key).
+Status: Phases 0-1 merged (2026-10-03). **Phase 2 implemented on `phase-2`, awaiting review.**
+Open item carried over: EVDS parser validation against recorded live responses (needs a key).
+Phase 2 deviations: pypdfium2 instead of PyMuPDF (ADR 0002, licence); documents are fetched by an
+explicit `ingest` command (never during tool calls); `reparse` rebuilds from local PDFs.
 Facts are in `docs/data-sources.md`; competitor analysis is in `docs/positioning.md`.
 
 Defaults applied when Phase 0 questions went unanswered: uv installed via `pip --user`; repo stays

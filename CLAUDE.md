@@ -10,12 +10,15 @@ On this Windows machine uv is at `%APPDATA%\Python\Python312\Scripts\uv.exe` (no
 ```
 uv sync --extra dev                  # setup
 uv run tr-macro-mcp                  # run stdio server (logs to stderr; stdout is the protocol)
+uv run tr-macro-mcp ingest           # download/index TCMB documents (idempotent, ~1 req/s)
 uv run pytest                        # tests (offline, fixtures only; `live` excluded)
 uv run pytest -m live                # live stdio smoke test against TCMB
 uv run ruff check . && uv run ruff format --check .
 uv run mypy                          # strict, src/ only
 uv run python scripts/record_fx_fixtures.py     # re-record TCMB XML fixtures
 uv run python scripts/record_evds_fixtures.py   # record real EVDS fixtures (needs key)
+uv run python scripts/record_doc_fixtures.py    # re-record TCMB document fixtures
+uv run python scripts/make_poisoned_pdf.py      # regenerate prompt-injection test PDF
 make eval-quick                      # offline, keyless retrieval eval (Phase 4+)
 ```
 
@@ -24,7 +27,13 @@ make eval-quick                      # offline, keyless retrieval eval (Phase 4+
   `httpx.MockTransport` and a fixed date) + `main()`.
 - `datasources/`: `base.DataSource` protocol, `tcmb_fx_xml`, `evds`, `registry` (routes codes:
   `FX:*` → XML, everything else → EVDS).
-- `store/timeseries.py`: DuckDB `fx_bulletins` (past dates permanent) + `response_cache` (TTL).
+- `store/db.py`: short-lived DuckDB connections with lock retry (several processes share files).
+- `store/timeseries.py`: `cache.duckdb`: `fx_bulletins` (past dates permanent) + `response_cache` (TTL).
+- `docs/`: `fetch` (discover by following index links), `parse` (pypdfium2: pages, printed page
+  labels, outline), `ingest` (idempotent), `registry` (`documents.duckdb`, sanitised page text),
+  `navigate` (Mode A queries). PDFs are kept in `<cache>/documents/`.
+- `security/sanitize.py`: applied at ingest; output is wrapped at read time. Changing the rules
+  requires re-ingesting (delete `documents.duckdb`).
 - `tools/`: thin MCP tools; `tool_errors` turns `TrMacroError` into `ToolError`.
 - `tests/conftest.py`: `FakeTcmb` (recorded XML; unknown URLs fail the test) and `FakeEvds`
   (SYNTHETIC payloads with fake codes like `TP.TEST.RATE`, until real fixtures are recorded).
@@ -53,6 +62,11 @@ make eval-quick                      # offline, keyless retrieval eval (Phase 4+
   dates `dd-mm-yyyy`, max 1000 observations per request (chunk!), no search endpoint (local catalog).
 - FX XML: `kurlar/today.xml`, `kurlar/YYYYMM/DDMMYYYY.xml`; divide by `<Unit>` (JPY=100); pre-2005 is TRL + ISO-8859-9.
 - TCMB WCM URLs are irregular: discover links from index pages, don't construct them.
+
+## Gotchas
+- Tool input from the assistant collapses `\uXXXX` escapes into the literal character. Never type
+  `\u` escapes in Edit/Write/heredocs; build them with `chr()` and check with `repr()`.
+- Turkish casing: use `text.fold()` for matching ("İ"/"I"/"ı" differ under `str.lower()`).
 
 ## Conventions
 - Python 3.11+, uv, typed (`mypy --strict` on `src/`), ruff, pytest. pydantic v2 for all tool I/O.

@@ -10,6 +10,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from tr_macro_mcp.datasources.evds import EvdsSource
 from tr_macro_mcp.datasources.registry import SourceRegistry
 from tr_macro_mcp.datasources.tcmb_fx_xml import TcmbXmlFxSource
+from tr_macro_mcp.docs.navigate import DocumentNavigator
 from tr_macro_mcp.errors import TrMacroError
 
 P = ParamSpec("P")
@@ -21,6 +22,7 @@ class Services:
     registry: SourceRegistry
     fx: TcmbXmlFxSource
     evds: EvdsSource
+    documents: DocumentNavigator
 
 
 def tool_errors(fn: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:

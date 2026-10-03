@@ -12,7 +12,6 @@ fixtures with `scripts/record_evds_fixtures.py` once a key is available.
 import datetime as dt
 import json
 import re
-import unicodedata
 from typing import Any
 
 from pydantic import SecretStr
@@ -29,6 +28,7 @@ from tr_macro_mcp.models import (
     SeriesSearchResult,
 )
 from tr_macro_mcp.store.timeseries import Store, utcnow
+from tr_macro_mcp.text import fold
 
 BASE_URL = "https://evds3.tcmb.gov.tr/igmevdsms-dis/"
 WEB_URL = "https://evds3.tcmb.gov.tr/"
@@ -49,13 +49,6 @@ FREQUENCY_CODES: dict[str, int] = {
     "annual": 8,
 }
 _SERIES_CODE = re.compile(r"^[A-Za-z0-9_.]+$")
-_TURKISH_FOLD = str.maketrans("ıİşŞğĞüÜöÖçÇ", "iissgguuoocc")
-
-
-def fold(text: str) -> str:
-    """Lowercase, Turkish-aware, accent-free form for matching ('Döviz Kuru' -> 'doviz kuru')."""
-    text = text.translate(_TURKISH_FOLD).lower()
-    return "".join(c for c in unicodedata.normalize("NFKD", text) if not unicodedata.combining(c))
 
 
 def _tokens(text: str) -> list[str]:

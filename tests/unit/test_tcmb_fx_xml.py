@@ -1,4 +1,5 @@
 import datetime as dt
+from pathlib import Path
 
 import httpx
 import pytest
@@ -18,9 +19,9 @@ def tcmb() -> FakeTcmb:
 
 
 @pytest.fixture
-def source(tcmb: FakeTcmb) -> TcmbXmlFxSource:
+def source(tcmb: FakeTcmb, tmp_path: Path) -> TcmbXmlFxSource:
     http = PoliteClient(min_interval=0, timeout=5, transport=httpx.MockTransport(tcmb))
-    return TcmbXmlFxSource(http, Store(":memory:"), today=lambda: TODAY)
+    return TcmbXmlFxSource(http, Store(tmp_path / "cache.duckdb"), today=lambda: TODAY)
 
 
 class TestParseBulletin:

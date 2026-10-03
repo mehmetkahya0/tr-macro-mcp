@@ -3,6 +3,8 @@ real ones (scripts/record_evds_fixtures.py); test_recorded_fixtures_parse covers
 
 import datetime as dt
 import json
+import tempfile
+from pathlib import Path
 
 import httpx
 import pytest
@@ -11,13 +13,13 @@ from pydantic import SecretStr
 from tests.conftest import FIXTURES, TEST_KEY, FakeEvds
 from tr_macro_mcp.datasources.evds import (
     EvdsSource,
-    fold,
     parse_observations,
     parse_period,
 )
 from tr_macro_mcp.errors import InvalidRequestError, MissingKeyError, UpstreamError
 from tr_macro_mcp.httpclient import PoliteClient
 from tr_macro_mcp.store.timeseries import Store
+from tr_macro_mcp.text import fold
 
 pytestmark = pytest.mark.anyio
 RECORDED = FIXTURES / "evds" / "recorded"
@@ -29,8 +31,9 @@ def fake() -> FakeEvds:
 
 
 def make_source(fake: FakeEvds, key: str | None = TEST_KEY) -> EvdsSource:
+    store = Store(Path(tempfile.mkdtemp()) / "cache.duckdb")
     http = PoliteClient(min_interval=0, timeout=5, transport=httpx.MockTransport(fake))
-    return EvdsSource(http, Store(":memory:"), SecretStr(key) if key else None)
+    return EvdsSource(http, store, SecretStr(key) if key else None)
 
 
 @pytest.mark.parametrize(

@@ -1,12 +1,12 @@
 """DuckDB-backed local cache with retrieval timestamps ("as of") and TTLs."""
 
 import datetime as dt
-import threading
 from pathlib import Path
 from typing import Literal
 
-import duckdb
 from pydantic import BaseModel
+
+from tr_macro_mcp.store.db import DuckFile
 
 BulletinStatus = Literal["ok", "not_published"]
 
@@ -54,19 +54,14 @@ class CachedResponse(BaseModel):
 
 
 class Store:
-    """Single-file cache. Use ':memory:' in tests."""
+    """Single-file cache; safe to share between processes (see store/db.py)."""
 
-    def __init__(self, path: Path | str) -> None:
-        if isinstance(path, Path):
-            path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = duckdb.connect(str(path))
-        self._lock = threading.Lock()
-        with self._lock:
-            self._conn.execute(_SCHEMA)
+    def __init__(self, path: Path) -> None:
+        self._db = DuckFile(path, _SCHEMA)
 
     def get_bulletin(self, day: dt.date) -> CachedBulletin | None:
-        with self._lock:
-            row = self._conn.execute(
+        with self._db.connect() as conn:
+            row = conn.execute(
                 "SELECT bulletin_date, status, bulletin_no, url, payload, retrieved_at "
                 "FROM fx_bulletins WHERE bulletin_date = ?",
                 [day],
@@ -83,8 +78,8 @@ class Store:
         )
 
     def put_bulletin(self, bulletin: CachedBulletin) -> None:
-        with self._lock:
-            self._conn.execute(
+        with self._db.connect() as conn:
+            conn.execute(
                 "INSERT OR REPLACE INTO fx_bulletins VALUES (?, ?, ?, ?, ?, ?)",
                 [
                     bulletin.bulletin_date,
@@ -98,8 +93,8 @@ class Store:
 
     def get_response(self, key: str, max_age: dt.timedelta) -> CachedResponse | None:
         """Return a cached body if it is younger than max_age."""
-        with self._lock:
-            row = self._conn.execute(
+        with self._db.connect() as conn:
+            row = conn.execute(
                 "SELECT body, retrieved_at FROM response_cache WHERE cache_key = ?", [key]
             ).fetchone()
         if row is None:
@@ -110,12 +105,8 @@ class Store:
         return CachedResponse(body=bytes(row[0]), retrieved_at=retrieved_at)
 
     def put_response(self, key: str, body: bytes, retrieved_at: dt.datetime) -> None:
-        with self._lock:
-            self._conn.execute(
+        with self._db.connect() as conn:
+            conn.execute(
                 "INSERT OR REPLACE INTO response_cache VALUES (?, ?, ?)",
                 [key, body, _to_naive_utc(retrieved_at)],
             )
-
-    def close(self) -> None:
-        with self._lock:
-            self._conn.close()
