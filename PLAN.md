@@ -1,7 +1,11 @@
 # tr-macro-mcp — Plan
 
-Status: **Phase 0 complete, awaiting approval.** Facts are in `docs/data-sources.md`;
-competitor analysis is in `docs/positioning.md`.
+Status: Phase 0 approved and merged (2026-10-03). **Phase 1 implemented on `phase-1`,
+awaiting review.** Open item: EVDS parser validation against recorded live responses (needs a key).
+Facts are in `docs/data-sources.md`; competitor analysis is in `docs/positioning.md`.
+
+Defaults applied when Phase 0 questions went unanswered: uv installed via `pip --user`; repo stays
+local (no GitHub remote, nothing pushed); D4/D6 accepted; Phase 2 corpus as proposed below.
 
 ## 1. Proposed deviations from the brief
 

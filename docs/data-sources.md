@@ -126,8 +126,16 @@ Parameters are written **in the path, joined by `&`, not as a normal `?` query s
 - Live probes:
   - no header → `403`, `application/json`: `{"status":"403","message":"Required request header 'key' is not present"}`
   - invalid key → `401`, `text/plain`: `Invalid API Key`
-  - *Valid-key responses have not been recorded yet* (no key available in Phase 0). The JSON
-    shape of observation responses will be recorded as a fixture in Phase 1 before coding against it.
+  - *Valid-key responses have not been recorded yet* (no key was available in Phase 0 or 1).
+    Not shown in TCMB's guides either. **Secondary evidence only:** the `evds` PyPI client
+    (v0.4.0, which TCMB's Python guide `docId=13` tells users to install) reads observations from
+    `json["items"]`, where each item has `Tarih`, `UNIXTIME` and one column per series with
+    dots replaced by underscores (`TP_DK_USD_A`), values as strings. It reads metadata as
+    JSON lists with upper-case keys (`CATEGORY_ID`, `DATAGROUP_CODE`, `SERIE_CODE`, ...) and
+    uses an undocumented `datagroups/mode=2&code={category_id}`. Our parser follows this, matches
+    keys case-insensitively, and fails loudly on any other shape.
+    `scripts/record_evds_fixtures.py` records real responses (including a cross-check of
+    `TP.DK.USD.A.YTL` on 2025-01-02 against the XML bulletin's 35.2525) once a key exists.
 - Key: register at evds3.tcmb.gov.tr → Profile → "Copy API Key".
 - Formats: `csv`, `xml`, `json`. `decimalSeperator` (sic) `.` default.
 - Dates: `dd-mm-yyyy`. For a converted frequency, `startDate` must be the first day of the
