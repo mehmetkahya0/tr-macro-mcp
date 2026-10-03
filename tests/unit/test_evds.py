@@ -13,13 +13,13 @@ from pydantic import SecretStr
 from tests.conftest import FIXTURES, TEST_KEY, FakeEvds
 from tr_macro_mcp.datasources.evds import (
     EvdsSource,
-    fold,
     parse_observations,
     parse_period,
 )
 from tr_macro_mcp.errors import InvalidRequestError, MissingKeyError, UpstreamError
 from tr_macro_mcp.httpclient import PoliteClient
 from tr_macro_mcp.store.timeseries import Store
+from tr_macro_mcp.text import fold
 
 pytestmark = pytest.mark.anyio
 RECORDED = FIXTURES / "evds" / "recorded"
